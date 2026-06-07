@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bt-otel-collector-helm.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "bt-otel-collector-helm.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bt-otel-collector-helm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bt-otel-collector-helm.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "bt-otel-collector-helm.fullname" . }}
+      containers:
+        - name: otel-collector
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /otelcol-contrib
+            - --config=/etc/otelcol/config.yaml
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
+            - name: metrics
+              containerPort: 8888
+            - name: health-check
+              containerPort: 13133
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health-check
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health-check
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otelcol
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "bt-otel-collector-helm.fullname" . }}
+            items:
+              - key: otel-collector-config.yaml
+                path: config.yaml

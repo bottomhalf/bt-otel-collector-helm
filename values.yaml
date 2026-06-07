@@ -1,0 +1,69 @@
+# OpenTelemetry Collector Configuration
+namespace: bt
+replicaCount: 1
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: "0.102.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  ports:
+    otlp-grpc: 4317
+    otlp-http: 4318
+    metrics: 8888
+    health-check: 13133
+
+# Connectivity to backends
+backends:
+  loki:
+    endpoint: "http://btc-loki-helm.bt.svc.cluster.local:3100/loki/api/v1/push"
+  tempo:
+    endpoint: "bt-tempo-helm.bt.svc.cluster.local:4317"
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  
+  processors:
+    batch:
+      send_batch_size: 1000
+      timeout: 10s
+    memory_limiter:
+      check_interval: 1s
+      limit_percentage: 75
+      spike_limit_percentage: 15
+    resourcedetection:
+      detectors: ["env", "system", "k8snative"]
+      timeout: 2s
+
+  exporters:
+    logging:
+      verbosity: detailed
+    loki:
+      endpoint: "{{ .Values.backends.loki.endpoint }}"
+    otlp/tempo:
+      endpoint: "{{ .Values.backends.tempo.endpoint }}"
+      tls:
+        insecure: true
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, resourcedetection, batch]
+        exporters: [otlp/tempo, logging]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, resourcedetection, batch]
+        exporters: [logging]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, resourcedetection, batch]
+        exporters: [loki, logging]

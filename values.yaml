@@ -40,11 +40,11 @@ config:
       limit_percentage: 75
       spike_limit_percentage: 15
     resourcedetection:
-      detectors: ["env", "system", "k8snative"]
+      detectors: ["env", "system", "k8snode"]
       timeout: 2s
 
   exporters:
-    logging:
+    debug:
       verbosity: detailed
     loki:
       endpoint: "{{ .Values.backends.loki.endpoint }}"
@@ -58,12 +58,12 @@ config:
       traces:
         receivers: [otlp]
         processors: [memory_limiter, resourcedetection, batch]
-        exporters: [otlp/tempo, logging]
+        exporters: [otlp/tempo, debug]
       metrics:
         receivers: [otlp]
         processors: [memory_limiter, resourcedetection, batch]
-        exporters: [logging]
+        exporters: [debug]
       logs:
         receivers: [otlp]
         processors: [memory_limiter, resourcedetection, batch]
-        exporters: [loki, logging]
+        exporters: [loki, debug]
